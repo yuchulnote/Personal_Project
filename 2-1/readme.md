@@ -1,4 +1,4 @@
-#Covid Face Mask Webcam Classification : Custom CNN model with numpy(VGG6)
+# Covid Face Mask Webcam Classification : Custom CNN model with numpy(VGG6)
 ## 넘파이로 직접 구현하여 딥러닝이 어떻게 이루어지는 공부하기 위한 작품입니다.
 
 >참고자료 : 밑바닥부터 시작하는 딥러닝1
