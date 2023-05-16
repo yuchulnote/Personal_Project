@@ -1,0 +1,58 @@
+pytorch(https://pytorch.org/get-started/locally/) 사이트에 나와있는 cuda 버젼 확인 필수이다.
+작성일 기준 11.7 과 11.8 버젼이 있었고,
+
+https://docs.nvidia.com/deploy/cuda-compatibility/ 에서 확인한 결과
+11.8 버젼 기준 nvidia driver가 520을 넘어가면 호환이 되지 않는다고 나와있었다. 그래서 갖고 있던 최신 532드라이버를 삭제하고 재부팅 하였더니, 512.78 버젼으로 자동으로 다운그레이드 되었다.
+ 
+--
+
+Anaconda navigator로 가상환경을 만들어도 되고, cmd창에서  conda create -n (원하는이름) python=(파이썬버젼)
+
+버젼 고르기 위해서 네비게이터로 가상환경을 만들고 conda activate
+
+https://pytorch.org/get-started/locally/#windows-python 에서 python version을 3.8~3.11을 지원한다고 하니 무난하게 3.9
+
+본인 그래픽카드가 Hardware Generation에 어디에 속하는지 확인하고 알맞는 걸로 설치
+ 
+그러고 나서도 torch.cuda.is_available() 이  false가 뜨는 것을 확인하고 절망하였으나
+
+프롬프트창에 nvidia-smi 를 입력해보니 우측 상단에 CUDA Version: 11.6 이 뜬다 이것은 현재 드라이브에서 호환이 되는 최상 쿠다 버젼을 의미한다.
+
+그러고 nvcc-version을 프롬프트 창에 입력해보니 Build cuda_11.8으로 나오는 것을 확인할 수 있었다. 그러므로 드라이버를 좀 업데이트해야겠다고 생각이들었고
+
+(https://www.nvidia.co.kr/Download/Find.aspx?lang=kr#) 여기서 이전 버젼의 드라이버들을 다운 받을 수 있었고 제일 낮은 526 드라이버를 설치해주었다.
+
+그랬더니 nvidia-smi에 우측상단에 CUDA Version: 12.0으로 올라간 것을 확인
+
+======================================================================
+
+
+0. Pytorch get_started 공식문서를 확인해보니, Currently, PyTorch on Windows only supports Python 3.8-3.11; Python 2.x is not supported. 라고 적혀있다. 그러므로 Anaconda 가상환경을 만들 때 Anaconda Navigator상에서 Python 3.8~3.11 사이의 값으로 다운로드 해주도록 하자.
+
+1. Google에 nvidia gpu compatibility 검색 후 맨 위에 창에 들어가서 확인
+
+내 그래픽 카드는 Ampere 8.6 성능임을 확인. => 저기 어딘가에 내 gpu가 있으면 cuda를 지원한다는 의미이다.
+
+2. 그래픽 드라이버는 최신으로 설치, nvidia-smi의 우측 상단에 뜨는 CUDA Version은 그래픽 드라이버를 통해 지원할 수 있는 최대 버젼을 의미하므로 범위를 최대한 넓혀주자.
+
+3. https://docs.nvidia.com/deploy/cuda-compatibility/ 에 들어가서 아래로 쭉 내리다보면 which GPUs are supportes by the driver? 의 그림을 보면 본인 기준 NVIDIA Ampere GPU에 속하고, Compute Capability 는 8.6임을 앞서 확인하였고 CTK Support(Cuda ToolKit)이 11.0~current로 나와있는 것을 확인할 수 있었다.
+그러므로 최소한 11.0 이상 버젼인 cuda toolkit을 다운받아야한다.
+그리고 Driver는 항상 latest까지 지원하므로 아까 드라이버 최신으로 설치하였으니 문제 없다.
+
+4.https://en.wikipedia.org/wiki/CUDA#GPUs_supported 에 들어가서 그렇다면 어떤 쿠다 버젼을 설치하면 좋을지 확인하자. 아래로 내리다 보면 GPUs supported 라는 초록색 엑셀표를 볼 수 있는데 여기서도 마찬가지로 Ampere이고 나의 8.6이 속하는 초록색 구간을 확인해보니 11.1~12.0 이면 가능하다는 것을 확인할 수 있다.
+
+그래서 필자는 11.7 cudatoolkit을 아나콘다 프롬프트 창에서 설치하였고 cudnn도 설치 하니 성공~
+
+
+===============================================opencv-cuda설정===========
+하..
+
+1. 새 가상환경 python = 3.8 로 설정
+
+2. 호환 확인 후, pytorch installation에서 11.7 다운코드 복붙 conda install pytorch torchvision torchaudio pytorch-cuda=11.7 -c pytorch -c nvidia 아나콘다 프롬프트에서 입력
+
+3. https://anaconda.org/nvidia/cuda-toolkit 에서 11.7.0 버젼 한 번 더 conda install -c "nvidia/label/cuda-11.7.0" cuda-toolkit
+
+4. conda install -c anaconda cudnn
+
+성공!!
