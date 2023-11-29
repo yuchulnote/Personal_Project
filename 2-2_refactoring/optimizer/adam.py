@@ -5,7 +5,7 @@ class Adam:
     Adam(Adaptive Moment Estimation) 최적화 알고리즘을 구현한 클래스.
 
     Adam은 모멘텀과 RMSProp의 아이디어를 결합한 알고리즘으로,
-    각 매개변수에 대해 적응적인 학습률을 조정합니다.
+    각 매개변수에 대해 적응적인 학습률을 조정한다.
 
     Attributes:
         lr (float): 학습률.
