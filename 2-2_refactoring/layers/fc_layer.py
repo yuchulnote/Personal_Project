@@ -81,6 +81,7 @@ class FC_Layer:
         self.db = np.sum(dout, axis=0)  # dout의 각 열에 대한 합, 편향은 각 출력 뉴런에 더해지므로, 그래디언트는 dout의 합
 
         # 입력 데이터의 그래디언트를 원래 형태로 변환
+        # * 연산자를 이용하여 튜플이나 리스트와 같은 반복 가능한(iterable) 객체의 요소를 개별적인 인자로 풀어서(unpack) 전달
         dx = dx.reshape(*self.original_x_shape)
         
         return dx
