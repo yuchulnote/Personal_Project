@@ -39,6 +39,7 @@ class FC_Layer:
 
         Parameters:
             x (numpy.array): 입력 데이터.
+            x.shape[0] : 배치 크기
 
         Returns:
             numpy.array: 계층을 통과한 후의 출력 데이터.
@@ -46,7 +47,7 @@ class FC_Layer:
         # 입력 데이터의 원래 형태 저장
         self.original_x_shape = x.shape
         # 데이터를 2차원으로 변환
-        x = x.reshape(x.shape[0], -1)
+        x = x.reshape(x.shape[0], -1)  # 이미지 데이터라면, 일렬로 펴진 벡터로 변환시키기 위한 과정
         self.x = x
 
         # 완전 연결 계층의 연산 수행
@@ -63,14 +64,21 @@ class FC_Layer:
 
         Parameters:
             dout (numpy.array): 출력에 대한 그래디언트.
+            dout의 각 열은 해당 계층의 각 뉴런에 대응한다.
 
         Returns:
             numpy.array: 입력에 대한 그래디언트.
+            역전파 과정에서는 순전파의 연산을 역으로 따라가야 한다. 순전파에서 x의 형태가 변형되었으므로 다시 되돌려야 함.
+            dx가 네트워크의 이전 계층으로 올바르게 전달 되어야 하기 때문.
         """
-        # 입력 데이터와 가중치에 대한 그래디언트 계산
-        dx = np.dot(dout, self.W.T)
-        self.dw = np.dot(self.x.T, dout)
-        self.db = np.sum(dout, axis=0)
+        # 입력에 대한 그래디언트 계산
+        dx = np.dot(dout, self.W.T)  # 순전파의 np.dot(self.x, self.W) 의 역연산
+        
+        # 가중치에 대한 그래디언트 계산
+        self.dw = np.dot(self.x.T, dout)  # 순전파의 W 가 x와 곱해진 것에 대한 역연산
+        
+        # 편향(바이어스)의 그래디언트 계산
+        self.db = np.sum(dout, axis=0)  # dout의 각 열에 대한 합, 편향은 각 출력 뉴런에 더해지므로, 그래디언트는 dout의 합
 
         # 입력 데이터의 그래디언트를 원래 형태로 변환
         dx = dx.reshape(*self.original_x_shape)
