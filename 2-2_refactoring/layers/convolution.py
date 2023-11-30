@@ -1,3 +1,15 @@
+import os
+import sys
+
+# 현재 스크립트 파일의 절대 경로
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# 현재 디렉토리의 부모 디렉토리 경로 (즉, '2-2_refactoring' 경로)
+parent_dir = os.path.dirname(current_dir)
+
+# 시스템 경로에 부모 디렉토리 추가
+sys.path.append(parent_dir)
+
 import numpy as np
 from common.im2col import im2col
 from common.col2im import col2im
