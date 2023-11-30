@@ -1,5 +1,6 @@
 import numpy as np
-from common import im2col, col2im
+from common.im2col import im2col
+from common.col2im import col2im
 
 class Convolution:
     """
