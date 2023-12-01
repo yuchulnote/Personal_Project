@@ -25,12 +25,13 @@ def im2col(input_data, filter_height, filter_width, stride=1, pad=0):
     # 출력 데이터의 높이와 너비 계산
     out_height = (Height + 2 * pad - filter_height) // stride + 1
     out_width = (Width + 2 * pad - filter_width) // stride + 1
-    
-    # 입력 데이터에 패딩 적용, 입력 데이터 : (배치크기, 채널 수, 높이, 너비)    
-    # 배치 크기에 대한 패딩은 없으므로 (0, 0)
-    # 채널 수에 대한 패딩은 없으므로 (0, 0)
-    # 높이와 너비에 패딩을 추가, 각 차원의 양쪽에 추가될 패딩의 크기
-    # 'constant' : 상수값으로 패딩을 채운다는 의미, 기본값은 0
+    """
+    입력 데이터에 패딩 적용, 입력 데이터 : (배치크기, 채널 수, 높이, 너비)    
+    배치 크기에 대한 패딩은 없으므로 (0, 0)
+    채널 수에 대한 패딩은 없으므로 (0, 0)
+    높이와 너비에 패딩을 추가, 각 차원의 양쪽에 추가될 패딩의 크기
+    'constant' : 상수값으로 패딩을 채운다는 의미, 기본값은 0
+    """
     img = np.pad(input_data, [(0,0), (0,0), (pad, pad), (pad, pad)], 'constant')
 
     # 2차원 배열로 변환할 때 사용할 임시 배열 생성
@@ -42,10 +43,13 @@ def im2col(input_data, filter_height, filter_width, stride=1, pad=0):
         for x in range(filter_width):
             x_max = x + stride * out_width
             col[:, :, y, x, :, :] = img[:, :, y:y_max:stride, x:x_max:stride]
-            
-    # 2차원 배열로 변환
-    # 바뀐 col : [Number, out_height, out_width, Channel, filter_height, filter_width]
-    # reshape된 2차원 col : [Number * out_height * out_width, Channel, filter_height, filter_width]
+    """        
+    2차원 배열로 변환
+    바뀐 col : [Number, out_height, out_width, Channel, filter_height, filter_width]
+    reshape된 2차원 col : [Number * out_height * out_width, Channel * filter_height * filter_width]
+    axis=0 -> Number * out_height * out_width -> 입력 데이터의 모든 위치에서 적용될 수 있는 필터 영역
+    axis=1 -> Channel * filter_height * filter_width -> 필터의 각 영역 내의 원소들을 평탄화한 형태
+    """
     col = col.transpose(0, 4, 5, 1, 2, 3).reshape(Number * out_height * out_width, -1)
     
     return col
