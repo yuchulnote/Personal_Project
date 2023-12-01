@@ -1,6 +1,6 @@
 import numpy as np
-from cross_entropy_loss import cross_entropy_error
-from softmax import softmax
+import softmax
+import cross_entropy_loss
 
 class SoftmaxWithLoss:
     """
