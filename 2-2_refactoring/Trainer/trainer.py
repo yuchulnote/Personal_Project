@@ -2,7 +2,8 @@ import sys, os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from optimizer.adam import Adam
 from utils import graph, visualize_result
-import tqdm, wandb
+import wandb
+from tqdm import tqdm
 
 class Trainer:
     """
@@ -69,7 +70,7 @@ class Trainer:
         name = "train" if self.train_mode else "evaluate"
 
         # tqdm을 이용하여 진행 상황 시각화
-        for x_batch, t_batch in tqdm(dataloader, dsec=name):
+        for x_batch, t_batch in tqdm(dataloader, desc=name):
             # 그래디언트 계산 및 최적화
             grads = self.network.gradient(x_batch, t_batch)
             self.optimizer.update(self.network.params, grads)
