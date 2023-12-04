@@ -11,8 +11,8 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
 import numpy as np
-from common.im2col import im2col
-from common.col2im import col2im
+from commons.im2col import im2col
+from commons.col2im import col2im
 
 class Convolution:
     """
