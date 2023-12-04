@@ -81,7 +81,7 @@ class VGG6:
                                        conv_param_2['stride'], conv_param_2['pad']))
         self.layers.append(BatchNormalization(self.params['gamma2'], self.params['beta2']))
         self.layers.append(ReLU())
-        self.layers.append(Pooling(pool_h=2, pool_w=2, stride=2))
+        self.layers.append(Pooling(pool_height=2, pool_width=2, stride=2))
 
         # 세 번째 컨볼루션 계층
         self.layers.append(Convolution(self.params['W3'], self.params['b3'],
@@ -94,7 +94,7 @@ class VGG6:
                                        conv_param_4['stride'], conv_param_4['pad']))
         self.layers.append(BatchNormalization(self.params['gamma4'], self.params['beta4']))
         self.layers.append(ReLU())
-        self.layers.append(Pooling(pool_h=2, pool_w=2, stride=2))
+        self.layers.append(Pooling(pool_height=2, pool_width=2, stride=2))
 
         # 완전 연결 계층 (Fully-Connected Layer)
         self.layers.append(FC_Layer(self.params['W5'], self.params['b5']))
