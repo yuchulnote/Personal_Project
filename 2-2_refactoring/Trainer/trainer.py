@@ -1,7 +1,7 @@
 import sys, os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from optimizer.adam import Adam
-from utils import graph
+from utils import graph, visualize_result
 import tqdm, wandb
 
 class Trainer:
@@ -113,6 +113,11 @@ class Trainer:
         """
         for epoch in range(self.epochs):
             self.train_step()
+            
+            if (epoch + 1) % 5 ==  0:
+                test_data, test_labels = next(iter(self.test_loader))
+                visualize_result.visualize_result(self.network, test_data, test_labels)
+            
             # 모델 파라미터 저장 및 그래프 그리기
             self.network.save_params(file_name=f"epoch_{epoch+current_epochs+1}.pkl")
             print(f"model({epoch+1}/{self.epochs}) is saved!")
