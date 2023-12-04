@@ -1,4 +1,3 @@
-import torch
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -14,23 +13,24 @@ def visualize_result(model, data, labels, num_samples=5):
         labels (torch.Tensor): 실제 레이블.
         num_samples (int): 시각화할 샘플의 수. 기본값은 5.
     """
-    model.eval()  # 모델을 평가 모드로 설정
-    with torch.no_grad():
-        outputs = model(data)
-        _, predicted = torch.max(outputs, 1)
+    
+    # 넘파이 기반 모델 예측 수행
+    outputs = model.predict(data)
+    predicted = np.argmax(outputs, axis=1)
 
-    if num_samples is None or num_samples > data.size(0):
-        num_samples = data.size(0)
+    if num_samples is None or num_samples > len(data):
+        num_samples = len(data)
     
     fig, axes = plt.subplots(num_samples, 2, figsize=(10, 2 * num_samples))
     for i in range(num_samples):
         # 원본 이미지
-        axes[i, 0].imshow(np.transpose(data[i].cpu().numpy(), (1, 2, 0)))
-        axes[i, 0].set_title('Original - Label: {}'.format(labels[i].item()))
+        img = np.transpose(data[i], (1, 2, 0)) # 데이터 형태가 (C, H, W)인 경우
+        axes[i, 0].imshow(img)
+        axes[i, 0].set_title('Original - Label: {}'.format(labels[i]))
         axes[i, 0].axis('off')
 
         # 예측 레이블
-        axes[i, 1].text(0.5, 0.5, 'Predicted: {}'.format(predicted[i].item()), 
+        axes[i, 1].text(0.5, 0.5, 'Predicted: {}'.format(predicted[i]), 
                         fontsize=14, ha='center')
         axes[i, 1].axis('off')
     
