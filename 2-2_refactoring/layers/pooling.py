@@ -51,6 +51,8 @@ class Pooling:
         """
         
         Number, Channel, Height, Width = x.shape
+        self.original_x_shape = x.shape
+        
         out_height = int(1 + (Height - self.pool_height) / self.stride)
         out_width = int(1 + (Width - self.pool_width) / self.stride)
         
@@ -77,6 +79,11 @@ class Pooling:
         Returns:
             numpy.ndarray: 입력 데이터에 대한 그래디언트.
         """
+        # 역전파에서 dout의 형태를 원래 입력 데이터 x의 형태로 재구성
+        dout = dout.reshape(self.original_x_shape[0], self.original_x_shape[1], 
+                            int((self.original_x_shape[2] - self.pool_height) / self.stride + 1), 
+                            int((self.original_x_shape[3] - self.pool_width) / self.stride + 1))
+        
         # dout를 적절한 형태로 전치시킨다
         # 이는 dout의 차원을 풀링 연산에 맞게 재배열하기 위함 -> (Number, Height, Width, Channel)
         dout = dout.transpose(0, 2, 3, 1)
