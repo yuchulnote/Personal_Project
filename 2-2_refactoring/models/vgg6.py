@@ -121,8 +121,12 @@ class VGG6:
         """
         for layer in self.layers:
             # 배치 정규화 계층의 경우 훈련 모드에 따라 다른 동작 수행
-            if isinstance(layer, BatchNormalization):
-                x = layer.forward(x, train_flg)
+            if isinstance(layer, BatchNormalization) or isinstance(layer, Pooling):
+                x = layer.forward(x)
+            elif isinstance(layer, FC_Layer):
+                # 컨볼루션 계층 출력을 평탄화
+                x = x.reshape(x.shape[0], -1)
+                x = layer.forward(x)
             else:
                 x = layer.forward(x)
                     
