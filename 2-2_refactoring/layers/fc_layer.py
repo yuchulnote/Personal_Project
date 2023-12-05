@@ -84,4 +84,7 @@ class FC_Layer:
         # * 연산자를 이용하여 튜플이나 리스트와 같은 반복 가능한(iterable) 객체의 요소를 개별적인 인자로 풀어서(unpack) 전달
         dx = dx.reshape(*self.original_x_shape)
         
+        # FC 계층 이전의 Convolution 혹은 Pooling 계층의 출력 형태로 변경
+        dx = dx.reshape(self.original_x_shape[0], -1, self.original_x_shape[2], self.original_x_shape[3])
+        
         return dx
