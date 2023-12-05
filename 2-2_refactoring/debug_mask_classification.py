@@ -316,7 +316,7 @@ class Convolution:
         self.col_W = None
         
         # 그래디언트 저장을 위한 변수
-        self.dW = None
+        self.dw = None
         self.db = None
         
     
@@ -369,8 +369,8 @@ class Convolution:
         self.db = np.sum(dout, axis=0)
         
         # 가중치 그래디언트 계산
-        self.dW = np.dot(self.col.T, dout)
-        self.dW = self.dW.transpose(1, 0).reshape(Filter_Number, Channel, Filter_Height, Filter_Width)
+        self.dw = np.dot(self.col.T, dout)
+        self.dw = self.dw.transpose(1, 0).reshape(Filter_Number, Channel, Filter_Height, Filter_Width)
         
         # 입력 데이터 그래디언트 계산
         dcol = np.dot(dout, self.col_W.T)
@@ -1199,7 +1199,7 @@ class VGG6:
         grads = {}
         for i, layer in enumerate(self.layers):
             if isinstance(layer, (Convolution, FC_Layer)):
-                grads['W' + str(i+1)] = layer.dW
+                grads['W' + str(i+1)] = layer.dw
                 grads['b' + str(i+1)] = layer.db
             if isinstance(layer, BatchNormalization):
                 grads['gamma' + str(i+1)] = layer.dgamma
@@ -1236,7 +1236,7 @@ class VGG6:
 
         for i, layer in enumerate(self.layers):
             if isinstance(layer, (Convolution, FC_Layer)):
-                layer.W = self.params['W' + str(i+1)]
+                layer.w = self.params['W' + str(i+1)]
                 layer.b = self.params['b' + str(i+1)]
             if isinstance(layer, BatchNormalization):
                 layer.gamma = self.params['gamma' + str(i+1)]

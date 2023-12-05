@@ -12,7 +12,7 @@ class FC_Layer:
         b (numpy.array): 바이어스 벡터.
         x (numpy.array): 계층에 입력된 데이터.
         original_x_shape (tuple): 입력 데이터의 원래 형태.
-        dw (numpy.array): 가중치에 대한 그래디언트.
+        dW (numpy.array): 가중치에 대한 그래디언트.
         db (numpy.array): 바이어스에 대한 그래디언트.
     """
 
@@ -29,7 +29,7 @@ class FC_Layer:
         self.x = None
         self.original_x_shape = None
         self.conv_output_shape = None
-        self.dw = None
+        self.dW = None
         self.db = None
         
     def forward(self, x):
@@ -81,7 +81,7 @@ class FC_Layer:
         dx = np.dot(dout, self.W.T)  # 순전파의 np.dot(self.x, self.W) 의 역연산
         
         # 가중치에 대한 그래디언트 계산
-        self.dw = np.dot(self.x.T, dout)  # 순전파의 W 가 x와 곱해진 것에 대한 역연산
+        self.dW = np.dot(self.x.T, dout)  # 순전파의 W 가 x와 곱해진 것에 대한 역연산
         
         # 편향(바이어스)의 그래디언트 계산
         self.db = np.sum(dout, axis=0)  # dout의 각 열에 대한 합, 편향은 각 출력 뉴런에 더해지므로, 그래디언트는 dout의 합
