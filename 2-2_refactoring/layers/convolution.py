@@ -95,7 +95,7 @@ class Convolution:
         self.dW = self.dW.transpose(1, 0).reshape(Filter_Number, Channel, Filter_Height, Filter_Width)
         
         # 입력 데이터 그래디언트 계산
-        dcol = np.dot(dout, self.col.T, dout)
+        dcol = np.dot(dout, self.col.T)
         dx = col2im(dcol, self.x.shape, Filter_Height, Filter_Width, self.stride, self.pad)
         
         return dx
