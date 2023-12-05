@@ -71,35 +71,65 @@ class VGG6:
         self.layers = []
 
         # 첫 번째 컨볼루션 계층
+        # 입력 형태: (N, C, H, W) -> 여기서 N은 배치 크기, C는 채널 수, H와 W는 이미지의 높이와 너비
+        # (32, 3, 224, 224)
+        # 출력 형태: (N, F1, H1, W1) -> 여기서 F1은 첫 번째 컨볼루션 계층의 필터 개수
+        # (32, 16, 112, 112)
         self.layers.append(Convolution(self.params['W1'], self.params['b1'],
                                        conv_param_1['stride'], conv_param_1['pad']))
         self.layers.append(BatchNormalization(self.params['gamma1'], self.params['beta1']))
         self.layers.append(ReLU())
 
         # 두 번째 컨볼루션 계층
+        # 입력 형태: (N, F1, H1, W1)
+        # (32, 16, 112, 112)
+        # 출력 형태: (N, F2, H2, W2) -> 여기서 F2는 두 번째 컨볼루션 계층의 필터 개수
+        # (32, 32, 112, 112) -> F2=32, H2=112, W2=112
         self.layers.append(Convolution(self.params['W2'], self.params['b2'],
                                        conv_param_2['stride'], conv_param_2['pad']))
         self.layers.append(BatchNormalization(self.params['gamma2'], self.params['beta2']))
         self.layers.append(ReLU())
+        
+        # 첫 번째 풀링 계층
+        # 입력 형태: (32, 32, 112, 112) -> 두 번째 컨볼루션 계층의 출력
+        # 출력 형태: (32, 32, 56, 56) -> H2'=56, W2'=56
         self.layers.append(Pooling(pool_height=2, pool_width=2, stride=2))
 
         # 세 번째 컨볼루션 계층
+        # 입력 형태: (N, F2, H2, W2)
+        # (32, 32, 56, 56)
+        # 출력 형태: (N, F3, H3, W3) -> 여기서 F3는 세 번째 컨볼루션 계층의 필터 개수
+        # (32, 32, 56, 56)
         self.layers.append(Convolution(self.params['W3'], self.params['b3'],
                                        conv_param_3['stride'], conv_param_3['pad']))
         self.layers.append(BatchNormalization(self.params['gamma3'], self.params['beta3']))
         self.layers.append(ReLU())
 
         # 네 번째 컨볼루션 계층
+        # 입력 형태: (N, F3, H3, W3)
+        # (32, 32, 56, 56)
+        # 출력 형태: (N, F4, H4, W4) -> 여기서 F4는 네 번째 컨볼루션 계층의 필터 개수
+        # (32, 64, 28, 28) -> F4=64, H4=28, W4=28
         self.layers.append(Convolution(self.params['W4'], self.params['b4'],
                                        conv_param_4['stride'], conv_param_4['pad']))
         self.layers.append(BatchNormalization(self.params['gamma4'], self.params['beta4']))
         self.layers.append(ReLU())
+        
+        # 두 번째 풀링 계층
+        # 입력 형태: (32, 64, 28, 28) -> 네 번째 컨볼루션 계층의 출력
+        # 출력 형태: (32, 64, 14, 14) -> H4'=14, W4'=14
         self.layers.append(Pooling(pool_height=2, pool_width=2, stride=2))
 
-        # 완전 연결 계층 (Fully-Connected Layer)
+        # 첫 번째 완전 연결 계층
+        # 입력 형태: (32, 64*14*14) -> 풀링 계층의 출력을 평탄화
+        # 출력 형태: (32, 50) -> hidden_size=50
         self.layers.append(FC_Layer(self.params['W5'], self.params['b5']))
         self.layers.append(ReLU())
         self.layers.append(Dropout(0.5))
+        
+        # 두 번째 완전 연결 계층
+        # 입력 형태: (32, 50) -> 첫 번째 완전 연결 계층의 출력
+        # 출력 형태: (32, 2) -> output_size=2 (분류 클래스 수)
         self.layers.append(FC_Layer(self.params['W6'], self.params['b6']))
         self.layers.append(ReLU())
         self.layers.append(Dropout(0.5))
