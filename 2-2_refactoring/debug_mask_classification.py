@@ -194,8 +194,9 @@ class BatchNormalization:
         self.momentum = momentum
         self.input_shape = None  # 입력 데이터 형태 저장 (합성곱 또는 완전 연결)
 
-        self.running_mean = running_mean if running_mean is not None else np.zeros_like(gamma)
-        self.running_var = running_var if running_var is not None else np.zeros_like(gamma)
+        # running_mean과 running_var를 None으로 초기화
+        self.running_mean = running_mean
+        self.running_var = running_var
 
         # 역전파 시 사용될 중간 데이터 저장
         self.batch_size = None
@@ -217,12 +218,26 @@ class BatchNormalization:
             np.array: 배치 정규화된 출력 데이터.
         """
         self.input_shape = x.shape
+        original_shape = x.shape
+        
+        # 2차원이 아닌 경우 형태 변환
         if x.ndim != 2:
             Number, Channel, Height, Width = x.shape
             x = x.reshape(Number, -1)
 
+        # 여기서 running_mean과 running_var 초기화
+        if self.running_mean is None or self.running_var is None:
+            Dimension = x.shape[1]  # x의 특성 수
+            self.running_mean = np.zeros(Dimension)
+            self.running_var = np.zeros(Dimension)
+        
         out = self.__forward(x, train_flag)
-        return out.reshape(*self.input_shape)
+        
+        # 결과를 원래 형태로 되돌림
+        if out.ndim != 2:
+            out = out.reshape(Number, Channel, Height, Width)
+        
+        return out
 
     def __forward(self, x, train_flag):
         # 실행 평균 및 분산 초기화
@@ -253,7 +268,11 @@ class BatchNormalization:
             centered_input = x - self.running_mean
             normalized_input = centered_input / (np.sqrt(self.running_var + 10e-7))
 
-        out = self.gamma * normalized_input + self.beta
+        # 감마와 베타를 x의 형태에 맞게 조정
+        gamma_reshaped = self.gamma.reshape(1, -1, 1, 1)  # (1, filter_num, 1, 1)
+        beta_reshaped = self.beta.reshape(1, -1, 1, 1)    # (1, filter_num, 1, 1)
+        
+        out = gamma_reshaped * normalized_input + beta_reshaped
         return out
 
     def backward(self, dout):
