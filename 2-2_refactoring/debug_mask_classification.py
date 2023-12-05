@@ -1020,14 +1020,14 @@ class VGG6:
         
         # 각 컨볼루션 계층의 가중치와 편향 초기화
         for idx, conv_param in enumerate([conv_param_1, conv_param_2, conv_param_3, conv_param_4]):
-            self.params['W' + str(idx + 1)] = weight_init_scales[idx] * np.random.randn(conv_param['filter_num'],
-                                                                                       pre_channel_num,
-                                                                                       conv_param['filter_size'],
-                                                                                       conv_param['filter_size'])
+            self.params['W' + str(idx + 1)] = weight_init_scales[idx] * np.random.randn(conv_param['filter_num'], pre_channel_num, conv_param['filter_size'], conv_param['filter_size'])
             self.params['b' + str(idx + 1)] = np.zeros(conv_param['filter_num'])
             pre_channel_num = conv_param['filter_num']
-            self.params['gamma' + str(idx + 1)] = 1.0
-            self.params['beta' + str(idx + 1)] = 0.0
+        
+        # BatchNormalization 파라미터 추가
+        for idx, conv_param in enumerate([conv_param_1, conv_param_2, conv_param_3, conv_param_4]):
+            self.params['gamma' + str(idx + 1)] = np.ones(conv_param['filter_num'])
+            self.params['beta' + str(idx + 1)] = np.zeros(conv_param['filter_num'])
 
         # 완전 연결 계층의 가중치와 편향 초기화
         self.params['W5'] = weight_init_scales[4] * np.random.randn(64 * 7 * 7, hidden_size)
@@ -1313,6 +1313,12 @@ class Trainer:
         for x_batch, t_batch in tqdm(dataloader, desc=name):
             # 그래디언트 계산 및 최적화
             grads = self.network.gradient(x_batch, t_batch)
+            
+            # network.params에 없는 키를 grads에서 제거
+            keys_to_remove = [key for key in grads.keys() if key not in self.network.params]
+            for key in keys_to_remove:
+                del grads[key]
+
             self.optimizer.update(self.network.params, grads)
             
             # 손실 계산
