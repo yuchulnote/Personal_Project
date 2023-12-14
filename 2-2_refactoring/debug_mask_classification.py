@@ -181,8 +181,8 @@ class BatchNormalization:
     이 클래스는 각 특성에 대해 평균을 0, 분산을 1로 정규화한 후 스케일 및 시프트 변환을 수행한다.
 
     Attributes:
-        gamma (np.array): 스케일 변환 파라미터.
-        beta (np.array): 시프트 변환 파라미터.
+        gamma (np.array): 스케일 변환 파라미터. VGG6에서 전달 받는 값 : (16,) , (32,), (32,), (64,)
+        beta (np.array): 시프트 변환 파라미터. VGG6에서 전달 받는 값 : (16,) , (32,), (32,), (64,)
         momentum (float): 실행 평균 및 분산을 위한 모멘텀 값.
         running_mean (np.array): 실행 평균.
         running_var (np.array): 실행 분산.
@@ -218,62 +218,83 @@ class BatchNormalization:
             np.array: 배치 정규화된 출력 데이터.
         """
         self.input_shape = x.shape
-        print(self.input_shape)
+        print(self.input_shape)  # (32, 16, 112, 112)
         original_shape = x.shape
-        print(original_shape)
+        print(original_shape)  # (32, 16, 112, 112)
         
         # 2차원이 아닌 경우 형태 변환
         if x.ndim != 2:
             Number, Channel, Height, Width = x.shape
             x = x.reshape(Number, -1)
-            print(f"4차원 -> 2차원 : {x.shape}")
+            print(f"4차원 -> 2차원 : {x.shape}")  # (32, 200704)
 
         # 여기서 running_mean과 running_var 초기화
         if self.running_mean is None or self.running_var is None:
             Dimension = x.shape[1]  # x의 특성 수
+            print(f"x.shape[1] : {Dimension}")  # 200704
             self.running_mean = np.zeros(Dimension)
+            print(f"self.running_mean.shape 초기화 : {self.running_mean.shape}")  # (200704,)
             self.running_var = np.zeros(Dimension)
+            print(f"self.running_var.shape 초기화 : {self.running_var.shape}")  # (200704,)
         
         out = self.__forward(x, train_flag)
         
         # 결과를 원래 형태로 되돌림
         if out.ndim != 2:
             out = out.reshape(original_shape)
+            print(f"원래 차원으로 되돌리기 out.shape : {out.shape}")
         
         return out
 
     def __forward(self, x, train_flag):
         # 실행 평균 및 분산 초기화
+        # forward 함수에서 이미 초기화해서 진행되지 않는 것 같음.
         if self.running_mean is None:
             Number, Dimension = x.shape
+            print(f"__forward, x.shape : {x.shape}")
             self.running_mean = np.zeros(Dimension)
+            print(f"__forward, self.running_mean.shape 초기화 : {self.running_mean.shape}")
             self.running_var = np.zeros(Dimension)
+            print(f"__forward, self.running_var.shape 초기화 : {self.running_var.shape}")
 
         if train_flag:
             # 훈련 모드
             mu = x.mean(axis=0)
+            print(f"mu.shape : {mu.shape}")  # (200704,)
             centered_input = x - mu
+            print(f"centered_input.shape : {centered_input.shape}")  # (32, 200704)
             var = np.mean(centered_input**2, axis=0)
+            print(f"var.shape : {var.shape}")  # (200704,)
             std = np.sqrt(var + 10e-7)
+            print(f"std.shape : {std.shape}")  # (200704,)
             normalized_input = centered_input / std
+            print(f"normalized_input.shape : {normalized_input.shape}")  # (32, 200704)
 
             # 역전파를 위한 중간 데이터 저장
             self.batch_size = x.shape[0]
+            print(f"batchsize : {self.batch_size}")  # 32
             self.centered_input = centered_input
             self.normalized_input = normalized_input
             self.std = std
 
             # 실행 평균 및 분산 업데이트
             self.running_mean = self.momentum * self.running_mean + (1-self.momentum) * mu
+            print(f"self.running_mean.shape : {self.running_mean.shape}")  # (200704,)
             self.running_var = self.momentum * self.running_var + (1-self.momentum) * var
+            print(f"self.running_var.shape : {self.running_var.shape}")  # (200704,)
         else:
             # 추론 모드
+            print("BN __forward의 추론모드 입니다.")
             centered_input = x - self.running_mean
+            print(f"centered_input.shape : {centered_input.shape}")
             normalized_input = centered_input / (np.sqrt(self.running_var + 10e-7))
+            print(f"normalized_input.shape : {normalized_input.shape}")
 
         # 감마와 베타를 x의 형태에 맞게 조정
         gamma_reshaped = self.gamma.reshape(1, -1)
+        print(f"gamma_reshaped.shape : {gamma_reshaped.shape}")  # (1, 16)
         beta_reshaped = self.beta.reshape(1, -1)
+        print(f"beta_reshaped.shape : {beta_reshaped.shape}")  # (1, 16)
         
         if x.ndim == 4:  # 입력이 4차원일 경우
             Number, Channel, Height, Width = x.shape
@@ -283,7 +304,7 @@ class BatchNormalization:
             D = x.shape[1]
             gamma_reshaped = self.gamma.reshape(1, D)
             beta_reshaped = self.beta.reshape(1, D)
-        
+            
         out = gamma_reshaped * normalized_input + beta_reshaped
         
         return out
@@ -1059,7 +1080,9 @@ class VGG6:
         # BatchNormalization 파라미터 추가
         for idx, conv_param in enumerate([conv_param_1, conv_param_2, conv_param_3, conv_param_4]):
             self.params['gamma' + str(idx + 1)] = np.ones(conv_param['filter_num'])
+            print(f"VGG6, 추가된 gamma 파라미터 : {self.params['gamma' + str(idx + 1)].shape}")  #(16,) , (32,), (32,), (64,)
             self.params['beta' + str(idx + 1)] = np.zeros(conv_param['filter_num'])
+            print(f"VGG6, 추가된 beta 파라미터 : {self.params['beta' + str(idx + 1)].shape}")  #(16,) , (32,), (32,), (64,)
 
         # 완전 연결 계층의 가중치와 편향 초기화
         self.params['W5'] = weight_init_scales[4] * np.random.randn(64 * 7 * 7, hidden_size)
