@@ -218,12 +218,15 @@ class BatchNormalization:
             np.array: 배치 정규화된 출력 데이터.
         """
         self.input_shape = x.shape
+        print(self.input_shape)
         original_shape = x.shape
+        print(original_shape)
         
         # 2차원이 아닌 경우 형태 변환
         if x.ndim != 2:
             Number, Channel, Height, Width = x.shape
             x = x.reshape(Number, -1)
+            print(f"4차원 -> 2차원 : {x.shape}")
 
         # 여기서 running_mean과 running_var 초기화
         if self.running_mean is None or self.running_var is None:
@@ -235,7 +238,7 @@ class BatchNormalization:
         
         # 결과를 원래 형태로 되돌림
         if out.ndim != 2:
-            out = out.reshape(Number, Channel, Height, Width)
+            out = out.reshape(original_shape)
         
         return out
 
@@ -269,10 +272,20 @@ class BatchNormalization:
             normalized_input = centered_input / (np.sqrt(self.running_var + 10e-7))
 
         # 감마와 베타를 x의 형태에 맞게 조정
-        gamma_reshaped = self.gamma.reshape(1, -1, 1, 1)  # (1, filter_num, 1, 1)
-        beta_reshaped = self.beta.reshape(1, -1, 1, 1)    # (1, filter_num, 1, 1)
+        gamma_reshaped = self.gamma.reshape(1, -1)
+        beta_reshaped = self.beta.reshape(1, -1)
+        
+        if x.ndim == 4:  # 입력이 4차원일 경우
+            Number, Channel, Height, Width = x.shape
+            gamma_reshaped = self.gamma.reshape(1, Channel, 1, 1)
+            beta_reshaped = self.beta.reshape(1, Channel, 1, 1)
+        else:  # 입력이 2차원일 경우
+            D = x.shape[1]
+            gamma_reshaped = self.gamma.reshape(1, D)
+            beta_reshaped = self.beta.reshape(1, D)
         
         out = gamma_reshaped * normalized_input + beta_reshaped
+        
         return out
 
     def backward(self, dout):
@@ -507,7 +520,7 @@ class FC_Layer:
         
         # 컨볼루션 계층 또는 풀링 계층의 출력 형태를 저장
         if x.ndim == 4:  # 입력 x가 4차원인 경우(conv or pool)
-            self.conv_output_shape = x.shpae  # 형태 저장  
+            self.conv_output_shape = x.shape  # 형태 저장  
         
         # 데이터를 2차원으로 변환
         x = x.reshape(x.shape[0], -1)  # 이미지 데이터라면, 일렬로 펴진 벡터로 변환시키기 위한 과정
@@ -541,7 +554,7 @@ class FC_Layer:
         
         # 가중치에 대한 그래디언트 계산
         self.dw = np.dot(self.x.T, dout)  # 순전파의 W 가 x와 곱해진 것에 대한 역연산
-        # print(f"FC layer의 W와 x 곱의 역연산 shpae : {self.dw.shape}")
+        # print(f"FC layer의 W와 x 곱의 역연산 shape : {self.dw.shape}")
         
         # 편향(바이어스)의 그래디언트 계산
         self.db = np.sum(dout, axis=0)  # dout의 각 열에 대한 합, 편향은 각 출력 뉴런에 더해지므로, 그래디언트는 dout의 합
