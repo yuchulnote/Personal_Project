@@ -1461,6 +1461,8 @@ class Trainer:
             wandb.log({"epoch": epoch + current_epochs + 1, "avg_train_loss": avg_loss})
             if self.train_mode:
                 wandb.log({"avg_train_accuracy" : avg_acc})
+                print(f"avg_train_loss : {avg_loss}")
+                print(f"avg_train_acc : {avg_acc}")
             
             if (epoch + 1) % 5 ==  0:
                 test_data, test_labels = next(iter(self.test_loader))
