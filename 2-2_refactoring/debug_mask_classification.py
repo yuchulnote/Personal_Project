@@ -15,7 +15,7 @@ import cv2
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from tqdm import tqdm
-import wandb
+# import wandb
 import time
 import IProgress
 import shutil
@@ -227,6 +227,10 @@ class BatchNormalization:
             Number, Channel, Height, Width = x.shape
             x = x.reshape(Number, -1)
             print(f"4차원 -> 2차원 : {x.shape}")  # (32, 200704)
+            
+            out = self.__forward(x, train_flag)
+            
+            return out.reshape(*self.input_shape)
 
         # 여기서 running_mean과 running_var 초기화
         if self.running_mean is None or self.running_var is None:
@@ -249,6 +253,9 @@ class BatchNormalization:
     def __forward(self, x, train_flag):
         # 실행 평균 및 분산 초기화
         # forward 함수에서 이미 초기화해서 진행되지 않는 것 같음.
+        # print(f"x : {x}")
+        print(f"x.shape : {x.shape}")
+        
         if self.running_mean is None:
             Number, Dimension = x.shape
             print(f"__forward, x.shape : {x.shape}")
@@ -257,6 +264,9 @@ class BatchNormalization:
             self.running_var = np.zeros(Dimension)
             print(f"__forward, self.running_var.shape 초기화 : {self.running_var.shape}")
 
+        # print(f"x : {x}")
+        print(f"x.shape : {x.shape}")
+        
         if train_flag:
             # 훈련 모드
             mu = x.mean(axis=0)
@@ -296,15 +306,16 @@ class BatchNormalization:
         beta_reshaped = self.beta.reshape(1, -1)
         print(f"beta_reshaped.shape : {beta_reshaped.shape}")  # (1, 16)
         
-        if x.ndim == 4:  # 입력이 4차원일 경우
-            Number, Channel, Height, Width = x.shape
-            gamma_reshaped = self.gamma.reshape(1, Channel, 1, 1)
-            beta_reshaped = self.beta.reshape(1, Channel, 1, 1)
-        else:  # 입력이 2차원일 경우
-            D = x.shape[1]
-            gamma_reshaped = self.gamma.reshape(1, D)
-            beta_reshaped = self.beta.reshape(1, D)
-            
+        # if x.ndim == 4:  # 입력이 4차원일 경우
+        #     Number, Channel, Height, Width = x.shape
+        #     gamma_reshaped = self.gamma.reshape(1, Channel, 1, 1)
+        #     beta_reshaped = self.beta.reshape(1, Channel, 1, 1)
+        # else:  # 입력이 2차원일 경우
+        #     D = x.shape[1]
+        #     gamma_reshaped = self.gamma.reshape(1, D)
+        #     beta_reshaped = self.beta.reshape(1, D)
+        
+        # out = self.gamma * normalized_input + self.beta
         out = gamma_reshaped * normalized_input + beta_reshaped
         
         return out
@@ -848,6 +859,9 @@ class Adam:
         lr_t = self.lr * np.sqrt(1.0 - self.beta2**self.iter) / (1.0 - self.beta1**self.iter)
         
         for key in params.keys():
+            if key not in params:
+                print(f"Missing key in network.params: {key}")
+
             # 모멘텀과 RMSProp 업데이트
             self.m[key] = self.beta1 * self.m[key] + (1 - self.beta1) * grads[key]
             self.v[key] = self.beta2 * self.v[key] + (1 - self.beta2) * (grads[key]**2)
@@ -1078,11 +1092,11 @@ class VGG6:
             pre_channel_num = conv_param['filter_num']
         
         # BatchNormalization 파라미터 추가
-        for idx, conv_param in enumerate([conv_param_1, conv_param_2, conv_param_3, conv_param_4]):
-            self.params['gamma' + str(idx + 1)] = np.ones(conv_param['filter_num'])
-            print(f"VGG6, 추가된 gamma 파라미터 : {self.params['gamma' + str(idx + 1)].shape}")  #(16,) , (32,), (32,), (64,)
-            self.params['beta' + str(idx + 1)] = np.zeros(conv_param['filter_num'])
-            print(f"VGG6, 추가된 beta 파라미터 : {self.params['beta' + str(idx + 1)].shape}")  #(16,) , (32,), (32,), (64,)
+        # for idx, conv_param in enumerate([conv_param_1, conv_param_2, conv_param_3, conv_param_4]):
+            # self.params['gamma' + str(idx + 1)] = np.ones(conv_param['filter_num'])
+            # print(f"VGG6, 추가된 gamma 파라미터 : {self.params['gamma' + str(idx + 1)].shape}")  #(16,) , (32,), (32,), (64,)
+            # self.params['beta' + str(idx + 1)] = np.zeros(conv_param['filter_num'])
+            # print(f"VGG6, 추가된 beta 파라미터 : {self.params['beta' + str(idx + 1)].shape}")  #(16,) , (32,), (32,), (64,)
 
         # 완전 연결 계층의 가중치와 편향 초기화
         self.params['W5'] = weight_init_scales[4] * np.random.randn(64 * 7 * 7, hidden_size)
@@ -1100,7 +1114,7 @@ class VGG6:
         # (32, 16, 112, 112)
         self.layers.append(Convolution(self.params['W1'], self.params['b1'],
                                        conv_param_1['stride'], conv_param_1['pad']))
-        self.layers.append(BatchNormalization(self.params['gamma1'], self.params['beta1']))
+        # self.layers.append(BatchNormalization(self.params['gamma1'], self.params['beta1']))
         self.layers.append(ReLU())
 
         # 두 번째 컨볼루션 계층
@@ -1110,7 +1124,7 @@ class VGG6:
         # (32, 32, 112, 112) -> F2=32, H2=112, W2=112
         self.layers.append(Convolution(self.params['W2'], self.params['b2'],
                                        conv_param_2['stride'], conv_param_2['pad']))
-        self.layers.append(BatchNormalization(self.params['gamma2'], self.params['beta2']))
+        # self.layers.append(BatchNormalization(self.params['gamma2'], self.params['beta2']))
         self.layers.append(ReLU())
         
         # 첫 번째 풀링 계층
@@ -1125,7 +1139,7 @@ class VGG6:
         # (32, 32, 56, 56)
         self.layers.append(Convolution(self.params['W3'], self.params['b3'],
                                        conv_param_3['stride'], conv_param_3['pad']))
-        self.layers.append(BatchNormalization(self.params['gamma3'], self.params['beta3']))
+        # self.layers.append(BatchNormalization(self.params['gamma3'], self.params['beta3']))
         self.layers.append(ReLU())
 
         # 네 번째 컨볼루션 계층
@@ -1135,7 +1149,7 @@ class VGG6:
         # (32, 64, 28, 28) -> F4=64, H4=28, W4=28
         self.layers.append(Convolution(self.params['W4'], self.params['b4'],
                                        conv_param_4['stride'], conv_param_4['pad']))
-        self.layers.append(BatchNormalization(self.params['gamma4'], self.params['beta4']))
+        # self.layers.append(BatchNormalization(self.params['gamma4'], self.params['beta4']))
         self.layers.append(ReLU())
         
         # 두 번째 풀링 계층
@@ -1172,17 +1186,22 @@ class VGG6:
         Returns:
             numpy.ndarray: 모델의 예측 결과.
         """
+        # for layer in self.layers:
+        #     # 배치 정규화 계층의 경우 훈련 모드에 따라 다른 동작 수행
+        #     if isinstance(layer, BatchNormalization) or isinstance(layer, Pooling):
+        #         x = layer.forward(x)
+        #     elif isinstance(layer, FC_Layer):
+        #         # 컨볼루션 계층 출력을 평탄화
+        #         x = x.reshape(x.shape[0], -1)
+        #         x = layer.forward(x)
+        #     else:
+        #         x = layer.forward(x)
+                    
         for layer in self.layers:
-            # 배치 정규화 계층의 경우 훈련 모드에 따라 다른 동작 수행
-            if isinstance(layer, BatchNormalization) or isinstance(layer, Pooling):
-                x = layer.forward(x)
-            elif isinstance(layer, FC_Layer):
-                # 컨볼루션 계층 출력을 평탄화
-                x = x.reshape(x.shape[0], -1)
-                x = layer.forward(x)
+            if isinstance(layer, Dropout):
+                x = layer.forward(x, train_flg)
             else:
                 x = layer.forward(x)
-                    
         return x
     
     
@@ -1217,6 +1236,7 @@ class VGG6:
             t = np.argmax(t, axis=1)
 
         acc = 0.0
+        
         for i in range(int(x.shape[0] / batch_size)):
             tx = x[i*batch_size:(i+1)*batch_size]
             tt = t[i*batch_size:(i+1)*batch_size]
@@ -1245,20 +1265,26 @@ class VGG6:
         dout = 1
         dout = self.last_layer.backward(dout)
         
-        layers = self.layers.copy()
-        layers.reverse()
-        for layer in layers:
+        temp_layers = self.layers[::-1]
+        # layers = self.layers.copy()
+        # layers.reverse()
+        # for layer in layers:
+        for layer in temp_layers:
             dout = layer.backward(dout)
 
         # 결과 저장
         grads = {}
-        for i, layer in enumerate(self.layers):
-            if isinstance(layer, (Convolution, FC_Layer)):
-                grads['W' + str(i+1)] = layer.dw
-                grads['b' + str(i+1)] = layer.db
-            if isinstance(layer, BatchNormalization):
-                grads['gamma' + str(i+1)] = layer.dgamma
-                grads['beta' + str(i+1)] = layer.dbeta
+        conv_layer_count = 1
+        fc_layer_count = 1
+        for layer in self.layers:
+            if isinstance(layer, Convolution):
+                grads['W' + str(conv_layer_count)] = layer.dw
+                grads['b' + str(conv_layer_count)] = layer.db
+                conv_layer_count += 1
+            elif isinstance(layer, FC_Layer):
+                grads['W' + str(4 + fc_layer_count)] = layer.dw
+                grads['b' + str(4 + fc_layer_count)] = layer.db
+                fc_layer_count += 1
 
         return grads
 
@@ -1293,9 +1319,9 @@ class VGG6:
             if isinstance(layer, (Convolution, FC_Layer)):
                 layer.w = self.params['W' + str(i+1)]
                 layer.b = self.params['b' + str(i+1)]
-            if isinstance(layer, BatchNormalization):
-                layer.gamma = self.params['gamma' + str(i+1)]
-                layer.beta = self.params['beta' + str(i+1)]
+            # if isinstance(layer, BatchNormalization):
+            #     layer.gamma = self.params['gamma' + str(i+1)]
+            #     layer.beta = self.params['beta' + str(i+1)]
 
         print("Params loaded successfully:", self.params.keys())
         
@@ -1380,9 +1406,9 @@ class Trainer:
             loss = self.network.loss(x_batch, t_batch)
             
             # 훈련 중 손실 기록 및 wandb 로깅
-            if self.train_mode:
-                self.train_loss_list.append(loss)
-                wandb.log({"train_loss": loss})
+            # if self.train_mode:
+            #     self.train_loss_list.append(loss)
+            #     wandb.log({"train_loss": loss})
             
             # 상세 정보 출력    
             if self.verbose: 
@@ -1395,11 +1421,11 @@ class Trainer:
                 if self.train_mode:
                     train_acc = self.network.accuracy(x_batch, t_batch)
                     self.train_acc_list.append(train_acc)
-                    wandb.log({"train_accuracy": train_acc})
+                    # wandb.log({"train_accuracy": train_acc})
                 else:
                     test_acc = self.calculate_accuracy(self.test_loader)
                     self.test_acc_list.append(test_acc)
-                    wandb.log({"test_accuracy": test_acc})
+                    # wandb.log({"test_accuracy": test_acc})
 
                     if self.verbose: 
                         print("=== epoch:" + str(self.current_epoch) + ", train acc:" + str(train_acc) + ", test acc:" + str(test_acc) + " ===")
@@ -1596,25 +1622,25 @@ now = time.strftime('%Y%m%d%H%M', now)
 checkout_path = fr"./2-2_refactoring/checkout/{now}"
 os.makedirs(checkout_path, exist_ok=True)
 
-wandb.init(project='Mask_Classification', name='numpy_without_custom_data_shuffle_VGG6',
-           config={
-               'learning_rate' : 0.001,
-               'epochs' : 300,
-               'batch_size' : batch_size,
-               'dataset' : 'kaggle',
-               'architecture' : 'VGG6',
-               'optimizer' : 'Adam',
-               'criterion' : 'Cross Entropy Loss',
-               'lr_scheduler' : 'None',
-               'amp' : None,
-               'pin_memory' : True,
-               'non_blocking' : None,
-               'accumulation_steps' : None,
-               'num_workers' : num_workers,
-               'EarlyStopping' : True
-})
+# wandb.init(project='Mask_Classification', name='numpy_without_custom_data_shuffle_VGG6',
+#            config={
+#                'learning_rate' : 0.001,
+#                'epochs' : 300,
+#                'batch_size' : batch_size,
+#                'dataset' : 'kaggle',
+#                'architecture' : 'VGG6',
+#                'optimizer' : 'Adam',
+#                'criterion' : 'Cross Entropy Loss',
+#                'lr_scheduler' : 'None',
+#                'amp' : None,
+#                'pin_memory' : True,
+#                'non_blocking' : None,
+#                'accumulation_steps' : None,
+#                'num_workers' : num_workers,
+#                'EarlyStopping' : True
+# })
 
-config = wandb.config
+# config = wandb.config
 
 # Early Stop 설정
 early_stop = EarlyStopping(patience=10, verbose=True, save_path=checkout_path)
@@ -1623,4 +1649,4 @@ early_stop = EarlyStopping(patience=10, verbose=True, save_path=checkout_path)
 train_losses, val_losses = trainer.train(current_epochs=0)
 
 # W&b 종료
-wandb.finish()
+# wandb.finish()
