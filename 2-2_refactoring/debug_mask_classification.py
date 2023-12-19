@@ -15,7 +15,7 @@ import cv2
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from tqdm import tqdm
-# import wandb
+import wandb
 import time
 import IProgress
 import shutil
@@ -951,20 +951,20 @@ def get_grad(f, x):
     return grad
 
 
-def graph(data_list, title, color, save_path):
-    batch_num_list = [i for i in range(0, len(data_list))]
+# def graph(data_list, title, color, save_path):
+#     batch_num_list = [i for i in range(0, len(data_list))]
     
-    plt.figure(figsize=(20, 10))
-    plt.rc('font', size=25)
-    plt.plot(batch_num_list, data_list, color=color, marker='o', linestyle='solid')
-    plt.title(title)
-    plt.xlabel('Epoch')
+#     plt.figure(figsize=(20, 10))
+#     plt.rc('font', size=25)
+#     plt.plot(batch_num_list, data_list, color=color, marker='o', linestyle='solid')
+#     plt.title(title)
+#     plt.xlabel('Epoch')
     
-    title = plt.ylabel(title)
+#     title = plt.ylabel(title)
 
-    plt.savefig(save_path, dpi=600)
-    # plt.show()
-    plt.close()
+#     plt.savefig(save_path, dpi=600)
+#     # plt.show()
+#     plt.close()
     
 
 def split_dataset(src_folder, dst_base_folder, ratios=[0.8, 0.1, 0.1]):
@@ -1015,7 +1015,7 @@ def split_dataset(src_folder, dst_base_folder, ratios=[0.8, 0.1, 0.1]):
             shutil.copy(os.path.join(sub, img_file), os.path.join(final_destination, img_file))
             
 
-def visualize_result(model, data, labels, num_samples=5):
+def visualize_result(model, data, labels, num_samples=5, save_path=None):
     """
     분류 모델의 결과를 시각화하는 함수.
 
@@ -1049,8 +1049,10 @@ def visualize_result(model, data, labels, num_samples=5):
         axes[i, 1].axis('off')
     
     plt.tight_layout()
-    plt.show()
-    
+    if save_path is not None:
+        plt.savefig(save_path, dpi=600) 
+    # plt.show()
+    plt.close()
 
 class VGG6:
     """
@@ -1385,51 +1387,65 @@ class Trainer:
         """
         하나의 에폭 동안 모델을 훈련하는 단계.
         """
+        total_loss = 0
+        total_acc = 0
+        data_count = 0
         
         # 현재 훈련 상태에 따라 적절한 데이터 로더 선택
         dataloader = self.train_loader if self.train_mode else self.test_loader
         name = "train" if self.train_mode else "evaluate"
 
-        # tqdm을 이용하여 진행 상황 시각화
-        for x_batch, t_batch in tqdm(dataloader, desc=name):
+        for x_batch, t_batch in dataloader:
+            
+            batch_size = x_batch.shape[0]
+            data_count += batch_size
+            
             # 그래디언트 계산 및 최적화
             grads = self.network.gradient(x_batch, t_batch)
             
             # network.params에 없는 키를 grads에서 제거
-            keys_to_remove = [key for key in grads.keys() if key not in self.network.params]
-            for key in keys_to_remove:
-                del grads[key]
+            # keys_to_remove = [key for key in grads.keys() if key not in self.network.params]
+            # for key in keys_to_remove:
+            #     del grads[key]
 
             self.optimizer.update(self.network.params, grads)
             
             # 손실 계산
             loss = self.network.loss(x_batch, t_batch)
+            total_loss += loss * batch_size
             
             # 훈련 중 손실 기록 및 wandb 로깅
-            # if self.train_mode:
-            #     self.train_loss_list.append(loss)
-            #     wandb.log({"train_loss": loss})
+            if self.train_mode:
+                # self.train_loss_list.append(loss)
+                # wandb.log({"train_loss": loss})
+                acc = self.network.accuracy(x_batch, t_batch)
+                total_acc = acc * batch_size
             
             # 상세 정보 출력    
-            if self.verbose: 
-                print(f"\t{name} loss: {loss}")
+            # if self.verbose: 
+            #     print(f"\t{name} loss: {loss}")
 
             # 에폭의 마지막에서 정확도 계산
-            if self.current_iter % self.iter_per_epoch == 0:
-                self.current_epoch += 1
+            # if self.current_iter % self.iter_per_epoch == 0:
+            #     self.current_epoch += 1
 
-                if self.train_mode:
-                    train_acc = self.network.accuracy(x_batch, t_batch)
-                    self.train_acc_list.append(train_acc)
-                    # wandb.log({"train_accuracy": train_acc})
-                else:
-                    test_acc = self.calculate_accuracy(self.test_loader)
-                    self.test_acc_list.append(test_acc)
-                    # wandb.log({"test_accuracy": test_acc})
+            #     if self.train_mode:
+            #         train_acc = self.network.accuracy(x_batch, t_batch)
+            #         self.train_acc_list.append(train_acc)
+            #         wandb.log({"train_accuracy": train_acc})
+            #     else:
+            #         test_acc = self.calculate_accuracy(self.test_loader)
+            #         self.test_acc_list.append(test_acc)
+            #         wandb.log({"test_accuracy": test_acc})
 
-                    if self.verbose: 
-                        print("=== epoch:" + str(self.current_epoch) + ", train acc:" + str(train_acc) + ", test acc:" + str(test_acc) + " ===")
-            self.current_iter += 1
+            #         if self.verbose: 
+            #             print("=== epoch:" + str(self.current_epoch) + ", train acc:" + str(train_acc) + ", test acc:" + str(test_acc) + " ===")
+            # self.current_iter += 1
+            
+            avg_loss = total_loss / data_count
+            avg_acc = total_acc / data_count if self.train_mode else None
+            
+            return avg_loss, avg_acc
 
 
     def train(self, current_epochs):
@@ -1439,17 +1455,22 @@ class Trainer:
         Args:
             current_epochs (int): 현재까지 완료된 에폭 수.
         """
-        for epoch in range(self.epochs):
-            self.train_step()
+        for epoch in tqdm(range(self.epochs), desc="Training", total=self.epochs):
+            avg_loss, avg_acc = self.train_step()
             
-            if (epoch + 1) % 5 ==  0:
-                test_data, test_labels = next(iter(self.test_loader))
-                visualize_result.visualize_result(self.network, test_data, test_labels)
+            wandb.log({"epoch": epoch + current_epochs + 1, "avg_train_loss": avg_loss})
+            if self.train_mode:
+                wandb.log({"avg_train_accuracy" : avg_acc})
+            
+            # if (epoch + 1) % 5 ==  0:
+            test_data, test_labels = next(iter(self.test_loader))
+            visualize_result(self.network, test_data, test_labels, num_samples=5, save_path=fr"./visualize/visualized_epoch_{epoch+current_epochs+1}.png")
+            print(f"model_visualized_img({epoch+1}/{self.epochs}) is saved!")
             
             # 모델 파라미터 저장 및 그래프 그리기
-            self.network.save_params(file_name=f"epoch_{epoch+current_epochs+1}.pkl")
-            print(f"model({epoch+1}/{self.epochs}) is saved!")
-            graph(self.train_loss_list, 'loss', 'red', f"epoch_{epoch+current_epochs+1}")
+            # self.network.save_params(file_name=f"epoch_{epoch+current_epochs+1}.pkl")
+            # print(f"model({epoch+1}/{self.epochs}) is saved!")
+            # graph(self.train_loss_list, 'loss', 'red', f"epoch_{epoch+current_epochs+1}")
 
 
     def test(self):
@@ -1504,7 +1525,7 @@ torch.backends.cudnn.deterministic = False
 # True로 설정할 경우, 고정된 입력 크기에 대해 더 빠른 성능을 제공하지만, 다양한 크기의 입력에서는 성능 저하가 발생할 수 있음
 torch.backends.cudnn.benchmark = True
 
-# 데이터셋 디렉토리 설정 해야함
+# 데이터셋 디렉토리 설정
 data_dir = r'/mnt/hdd_2T/ivan/data/'
 
 # albumentations을 사용한 데이터 변환 정의
@@ -1565,8 +1586,8 @@ class MaskDataset(Dataset):
             tuple: (변환된 이미지, 레이블).
         """
         data_path = self.all_data[index]
-        img = Image.open(data_path)
-        label = 0 if os.path.basename(data_path).startswith("mask") else 1
+        img = Image.open(data_path).convert('RGB')
+        label = 0 if os.path.basename(os.path.dirname(data_path)).startswith("mask") else 1
         
         if self.transform:
             img = self.transform(image=np.array(img))["image"]
@@ -1622,25 +1643,25 @@ now = time.strftime('%Y%m%d%H%M', now)
 checkout_path = fr"./2-2_refactoring/checkout/{now}"
 os.makedirs(checkout_path, exist_ok=True)
 
-# wandb.init(project='Mask_Classification', name='numpy_without_custom_data_shuffle_VGG6',
-#            config={
-#                'learning_rate' : 0.001,
-#                'epochs' : 300,
-#                'batch_size' : batch_size,
-#                'dataset' : 'kaggle',
-#                'architecture' : 'VGG6',
-#                'optimizer' : 'Adam',
-#                'criterion' : 'Cross Entropy Loss',
-#                'lr_scheduler' : 'None',
-#                'amp' : None,
-#                'pin_memory' : True,
-#                'non_blocking' : None,
-#                'accumulation_steps' : None,
-#                'num_workers' : num_workers,
-#                'EarlyStopping' : True
-# })
+wandb.init(project='Mask_Classification', name='numpy_without custom shuffle & BN_VGG6',
+           config={
+               'learning_rate' : 0.001,
+               'epochs' : 300,
+               'batch_size' : batch_size,
+               'dataset' : 'kaggle',
+               'architecture' : 'VGG6',
+               'optimizer' : 'Adam',
+               'criterion' : 'Cross Entropy Loss',
+               'lr_scheduler' : 'None',
+               'amp' : None,
+               'pin_memory' : True,
+               'non_blocking' : None,
+               'accumulation_steps' : None,
+               'num_workers' : num_workers,
+               'EarlyStopping' : True
+})
 
-# config = wandb.config
+config = wandb.config
 
 # Early Stop 설정
 early_stop = EarlyStopping(patience=10, verbose=True, save_path=checkout_path)
@@ -1649,4 +1670,4 @@ early_stop = EarlyStopping(patience=10, verbose=True, save_path=checkout_path)
 train_losses, val_losses = trainer.train(current_epochs=0)
 
 # W&b 종료
-# wandb.finish()
+wandb.finish()
