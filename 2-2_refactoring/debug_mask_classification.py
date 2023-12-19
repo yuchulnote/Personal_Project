@@ -1462,15 +1462,15 @@ class Trainer:
             if self.train_mode:
                 wandb.log({"avg_train_accuracy" : avg_acc})
             
-            # if (epoch + 1) % 5 ==  0:
-            test_data, test_labels = next(iter(self.test_loader))
-            visualize_result(self.network, test_data, test_labels, num_samples=5, save_path=fr"./visualize/visualized_epoch_{epoch+current_epochs+1}.png")
-            print(f"model_visualized_img({epoch+1}/{self.epochs}) is saved!")
-            
-            # 모델 파라미터 저장 및 그래프 그리기
-            # self.network.save_params(file_name=f"epoch_{epoch+current_epochs+1}.pkl")
-            # print(f"model({epoch+1}/{self.epochs}) is saved!")
-            # graph(self.train_loss_list, 'loss', 'red', f"epoch_{epoch+current_epochs+1}")
+            if (epoch + 1) % 5 ==  0:
+                test_data, test_labels = next(iter(self.test_loader))
+                visualize_result(self.network, test_data, test_labels, num_samples=5, save_path=fr"./visualize/visualized_epoch_{epoch+current_epochs+1}.png")
+                print(f"model_visualized_img({epoch+1}/{self.epochs}) is saved!")
+                
+                # 모델 파라미터 저장 및 그래프 그리기
+                self.network.save_params(file_name=f"epoch_{epoch+current_epochs+1}.pkl")
+                print(f"model({epoch+1}/{self.epochs}) is saved!")
+                # graph(self.train_loss_list, 'loss', 'red', f"epoch_{epoch+current_epochs+1}")
 
 
     def test(self):
