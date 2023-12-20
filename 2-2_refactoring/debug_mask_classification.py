@@ -884,11 +884,16 @@ class EarlyStopping:
     
     
     def save_checkpoint(self, val_loss, model, epoch):
-        checkpoint_path = os.path.join(self.save_path, f"{self.base_path}_Best_{epoch+1}.npz")
-        np.savez(checkpoint_path, **model.params)
-        if self.verbose:
-            print(f"Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}). Saving model to {checkpoint_path} ...")
-        self.val_loss_min = val_loss
+        # checkpoint_path = os.path.join(self.save_path, f"{self.base_path}_Best_{epoch+1}.npz")
+        # np.savez(checkpoint_path, **model.params)
+        # if self.verbose:
+        #     print(f"Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}). Saving model to {checkpoint_path} ...")
+        # self.val_loss_min = val_loss
+        if val_loss < self.val_loss_min:
+            print(f"Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}). Saving model ...")
+            self.val_loss_min = val_loss
+            model.save_params(file_name=os.path.join(self.save_path, 'best.pkl'))
+        
         
     def step(self, val_loss, model, epoch):
         score = -val_loss
@@ -1348,7 +1353,7 @@ class Trainer:
         verbose (bool): 상세 정보 출력 여부.
     """
 
-    def __init__(self, network, x_train_loader, x_test_loader,
+    def __init__(self, network, x_train_loader, x_val_loader, x_test_loader,
                  epochs=30, mini_batch_size=32,
                  optimizer='adam', optimizer_param={'lr':0.0001}, 
                  evaluate_sample_num_per_epoch=None, verbose=True):
@@ -1356,6 +1361,7 @@ class Trainer:
         # 네트워크와 데이터 로더 초기화
         self.network = network
         self.train_loader = x_train_loader
+        self.val_loader = x_val_loader
         self.test_loader = x_test_loader
         
         # 훈련 설정 초기화
@@ -1458,19 +1464,31 @@ class Trainer:
         for epoch in tqdm(range(self.epochs), desc="Training", total=self.epochs):
             avg_loss, avg_acc = self.train_step()
             
+            val_loss = 0
+            for val_data, val_labels in self.val_loader:
+                val_loss += self.network.loss(val_data, val_labels)
+            val_loss /= len(self.val_loader)
+            
+            early_stop.step(val_loss, self.network, epoch)
+            
+            if early_stop.early_stop:
+                print("Early stopping")
+                break
+            
             wandb.log({"epoch": epoch + current_epochs + 1, "avg_train_loss": avg_loss})
             if self.train_mode:
                 wandb.log({"avg_train_accuracy" : avg_acc})
-                print(f"avg_train_loss : {avg_loss}")
-                print(f"avg_train_acc : {avg_acc}")
+                print(f"avg_train_loss : {avg_loss:.6f}")
+                print(f"avg_train_acc : {avg_acc:.6f}")
             
             if (epoch + 1) % 5 ==  0:
                 test_data, test_labels = next(iter(self.test_loader))
                 visualize_result(self.network, test_data, test_labels, num_samples=5, save_path=fr"./visualize/visualized_epoch_{epoch+current_epochs+1}.png")
                 print(f"model_visualized_img({epoch+1}/{self.epochs}) is saved!")
                 
-                # 모델 파라미터 저장 및 그래프 그리기
-                self.network.save_params(file_name=f"epoch_{epoch+current_epochs+1}.pkl")
+                # 모델 파라미터 저장
+                save_filename = os.path.join(checkout_path, f"epoch_{epoch+current_epochs+1}.pkl")
+                self.network.save_params(file_name=save_filename)
                 print(f"model({epoch+1}/{self.epochs}) is saved!")
                 # graph(self.train_loss_list, 'loss', 'red', f"epoch_{epoch+current_epochs+1}")
 
@@ -1633,7 +1651,7 @@ model = VGG6(
     output_size=2  
     )
 
-trainer = Trainer(model, x_train_loader = train_loader, x_test_loader = test_loader,
+trainer = Trainer(model, x_train_loader = train_loader, x_val_loader = val_loader, x_test_loader = test_loader,
                           epochs=num_epochs, mini_batch_size=batch_size,
                           optimizer='adam', evaluate_sample_num_per_epoch=5)
 
