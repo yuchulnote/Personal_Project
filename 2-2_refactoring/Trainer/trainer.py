@@ -25,7 +25,7 @@ class Trainer:
         verbose (bool): 상세 정보 출력 여부.
     """
 
-    def __init__(self, network, x_train_loader, x_test_loader,
+    def __init__(self, network, x_train_loader, x_val_loader, x_test_loader,
                  epochs=30, mini_batch_size=32,
                  optimizer='adam', optimizer_param={'lr':0.0001}, 
                  evaluate_sample_num_per_epoch=None, verbose=True):
@@ -33,6 +33,7 @@ class Trainer:
         # 네트워크와 데이터 로더 초기화
         self.network = network
         self.train_loader = x_train_loader
+        self.val_loader = x_val_loader
         self.test_loader = x_test_loader
         
         # 훈련 설정 초기화
@@ -64,45 +65,65 @@ class Trainer:
         """
         하나의 에폭 동안 모델을 훈련하는 단계.
         """
+        total_loss = 0
+        total_acc = 0
+        data_count = 0
         
         # 현재 훈련 상태에 따라 적절한 데이터 로더 선택
         dataloader = self.train_loader if self.train_mode else self.test_loader
         name = "train" if self.train_mode else "evaluate"
 
-        # tqdm을 이용하여 진행 상황 시각화
-        for x_batch, t_batch in tqdm(dataloader, desc=name):
+        for x_batch, t_batch in dataloader:
+            
+            batch_size = x_batch.shape[0]
+            data_count += batch_size
+            
             # 그래디언트 계산 및 최적화
             grads = self.network.gradient(x_batch, t_batch)
+            
+            # network.params에 없는 키를 grads에서 제거
+            # keys_to_remove = [key for key in grads.keys() if key not in self.network.params]
+            # for key in keys_to_remove:
+            #     del grads[key]
+
             self.optimizer.update(self.network.params, grads)
             
             # 손실 계산
             loss = self.network.loss(x_batch, t_batch)
+            total_loss += loss * batch_size
             
             # 훈련 중 손실 기록 및 wandb 로깅
             if self.train_mode:
-                self.train_loss_list.append(loss)
-                wandb.log({"train_loss": loss})
+                # self.train_loss_list.append(loss)
+                # wandb.log({"train_loss": loss})
+                acc = self.network.accuracy(x_batch, t_batch)
+                total_acc = acc * batch_size
             
             # 상세 정보 출력    
-            if self.verbose: 
-                print(f"\t{name} loss: {loss}")
+            # if self.verbose: 
+            #     print(f"\t{name} loss: {loss}")
 
             # 에폭의 마지막에서 정확도 계산
-            if self.current_iter % self.iter_per_epoch == 0:
-                self.current_epoch += 1
+            # if self.current_iter % self.iter_per_epoch == 0:
+            #     self.current_epoch += 1
 
-                if self.train_mode:
-                    train_acc = self.network.accuracy(x_batch, t_batch)
-                    self.train_acc_list.append(train_acc)
-                    wandb.log({"train_accuracy": train_acc})
-                else:
-                    test_acc = self.calculate_accuracy(self.test_loader)
-                    self.test_acc_list.append(test_acc)
-                    wandb.log({"test_accuracy": test_acc})
+            #     if self.train_mode:
+            #         train_acc = self.network.accuracy(x_batch, t_batch)
+            #         self.train_acc_list.append(train_acc)
+            #         wandb.log({"train_accuracy": train_acc})
+            #     else:
+            #         test_acc = self.calculate_accuracy(self.test_loader)
+            #         self.test_acc_list.append(test_acc)
+            #         wandb.log({"test_accuracy": test_acc})
 
-                    if self.verbose: 
-                        print("=== epoch:" + str(self.current_epoch) + ", train acc:" + str(train_acc) + ", test acc:" + str(test_acc) + " ===")
-            self.current_iter += 1
+            #         if self.verbose: 
+            #             print("=== epoch:" + str(self.current_epoch) + ", train acc:" + str(train_acc) + ", test acc:" + str(test_acc) + " ===")
+            # self.current_iter += 1
+            
+            avg_loss = total_loss / data_count
+            avg_acc = total_acc / data_count if self.train_mode else None
+            
+            return avg_loss, avg_acc
 
 
     def train(self, current_epochs):
@@ -112,17 +133,36 @@ class Trainer:
         Args:
             current_epochs (int): 현재까지 완료된 에폭 수.
         """
-        for epoch in range(self.epochs):
-            self.train_step()
+        for epoch in tqdm(range(self.epochs), desc="Training", total=self.epochs):
+            avg_loss, avg_acc = self.train_step()
+            
+            val_loss = 0
+            for val_data, val_labels in self.val_loader:
+                val_loss += self.network.loss(val_data, val_labels)
+            val_loss /= len(self.val_loader)
+            
+            early_stop.step(val_loss, self.network, epoch)
+            
+            if early_stop.early_stop:
+                print("Early stopping")
+                break
+            
+            wandb.log({"epoch": epoch + current_epochs + 1, "avg_train_loss": avg_loss})
+            if self.train_mode:
+                wandb.log({"avg_train_accuracy" : avg_acc})
+                print(f"avg_train_loss : {avg_loss:.6f}")
+                print(f"avg_train_acc : {avg_acc:.6f}")
             
             if (epoch + 1) % 5 ==  0:
                 test_data, test_labels = next(iter(self.test_loader))
-                visualize_result.visualize_result(self.network, test_data, test_labels)
-            
-            # 모델 파라미터 저장 및 그래프 그리기
-            self.network.save_params(file_name=f"epoch_{epoch+current_epochs+1}.pkl")
-            print(f"model({epoch+1}/{self.epochs}) is saved!")
-            graph(self.train_loss_list, 'loss', 'red', f"epoch_{epoch+current_epochs+1}")
+                visualize_result(self.network, test_data, test_labels, num_samples=5, save_path=fr"./visualize/visualized_epoch_{epoch+current_epochs+1}.png")
+                print(f"model_visualized_img({epoch+1}/{self.epochs}) is saved!")
+                
+                # 모델 파라미터 저장
+                save_filename = os.path.join(checkout_path, f"epoch_{epoch+current_epochs+1}.pkl")
+                self.network.save_params(file_name=save_filename)
+                print(f"model({epoch+1}/{self.epochs}) is saved!")
+                # graph(self.train_loss_list, 'loss', 'red', f"epoch_{epoch+current_epochs+1}")
 
 
     def test(self):

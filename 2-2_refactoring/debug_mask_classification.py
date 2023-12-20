@@ -223,14 +223,21 @@ class BatchNormalization:
         print(original_shape)  # (32, 16, 112, 112)
         
         # 2차원이 아닌 경우 형태 변환
+        # if x.ndim != 2:
+        #     Number, Channel, Height, Width = x.shape
+        #     x = x.reshape(Number, -1)
+        #     print(f"4차원 -> 2차원 : {x.shape}")  # (32, 200704)
+            
+        #     out = self.__forward(x, train_flag)
+            
+        #     return out.reshape(*self.input_shape)
+        
         if x.ndim != 2:
-            Number, Channel, Height, Width = x.shape
-            x = x.reshape(Number, -1)
-            print(f"4차원 -> 2차원 : {x.shape}")  # (32, 200704)
-            
-            out = self.__forward(x, train_flag)
-            
-            return out.reshape(*self.input_shape)
+            N, C, H, W = x.shape
+            x = x.reshape(N, -1)
+            self.channel_num = C  # 채널 수 저장
+        else:
+            self.channel_num = None  # 2차원인 경우 채널 수 없음
 
         # 여기서 running_mean과 running_var 초기화
         if self.running_mean is None or self.running_var is None:
@@ -244,9 +251,12 @@ class BatchNormalization:
         out = self.__forward(x, train_flag)
         
         # 결과를 원래 형태로 되돌림
-        if out.ndim != 2:
-            out = out.reshape(original_shape)
-            print(f"원래 차원으로 되돌리기 out.shape : {out.shape}")
+        # if out.ndim != 2:
+        #     out = out.reshape(original_shape)
+        #     print(f"원래 차원으로 되돌리기 out.shape : {out.shape}")
+        
+        if x.ndim != 2:
+            out = out.reshape(*self.input_shape)  # 원래 형태로 복원
         
         return out
 
@@ -299,25 +309,60 @@ class BatchNormalization:
             print(f"centered_input.shape : {centered_input.shape}")
             normalized_input = centered_input / (np.sqrt(self.running_var + 10e-7))
             print(f"normalized_input.shape : {normalized_input.shape}")
-
-        # 감마와 베타를 x의 형태에 맞게 조정
-        gamma_reshaped = self.gamma.reshape(1, -1)
-        print(f"gamma_reshaped.shape : {gamma_reshaped.shape}")  # (1, 16)
-        beta_reshaped = self.beta.reshape(1, -1)
-        print(f"beta_reshaped.shape : {beta_reshaped.shape}")  # (1, 16)
         
         # if x.ndim == 4:  # 입력이 4차원일 경우
-        #     Number, Channel, Height, Width = x.shape
+        #     Number, Channel, Height, Width = self.input_shape
         #     gamma_reshaped = self.gamma.reshape(1, Channel, 1, 1)
         #     beta_reshaped = self.beta.reshape(1, Channel, 1, 1)
+        #     normalized_input = normalized_input.reshape(Number, Channel, Height, Width)
         # else:  # 입력이 2차원일 경우
         #     D = x.shape[1]
         #     gamma_reshaped = self.gamma.reshape(1, D)
         #     beta_reshaped = self.beta.reshape(1, D)
+        """
+        BN 도입시 gamma, beta 관련하여 차원 에러가 고쳐지지가 않음....
+        'gamma_reshaped' 의 reshape 과정에서 에러가 발생
         
-        # out = self.gamma * normalized_input + self.beta
+        원본 'self.gamma'는 채널 수와 동일한 크기를 가진다. 따라서 x가 4차원일 경우에는 'gamma_reshaped'를
+        (1, C, 1, 1)로 2차원일 경우에는 (1, D)로 재조정
+            C는 채널 수, D는 x의 feature 수
+            
+        모델 구조와 BatchNormalization 클래스의 코드를 살펴본 결과, 여기에는 몇 가지 중요한 포인트가 있습니다. 문제의 핵심은 BatchNormalization 클래스에서 gamma와 beta 파라미터의 차원을 처리하는 방식과 관련이 있습니다.
+
+        BatchNormalization 클래스의 gamma와 beta의 초기화:
+
+        VGG6 클래스에서 BatchNormalization 계층을 추가할 때, gamma와 beta 파라미터는 각 컨볼루션 계층의 필터 개수와 동일한 크기로 초기화됩니다. 예를 들어, 첫 번째 컨볼루션 계층에서 필터 개수가 16개라면, gamma와 beta도 길이가 16인 배열로 초기화됩니다.
+        이는 4차원 입력 (예: 이미지 데이터)에 대해 각 채널별로 gamma와 beta를 적용하는 것이 적절합니다. 그러나 BatchNormalization 계층이 2차원 입력 (예: 완전 연결 계층의 출력)을 받을 때 문제가 발생할 수 있습니다. 이 경우 gamma와 beta는 입력 feature의 개수와 일치해야 합니다.
+        forward 메소드의 처리:
+
+        입력 x의 차원이 2차원이 아닐 때 (즉, 4차원일 때), x를 (N, -1)로 reshape하여 2차원으로 만듭니다. 이렇게 하면 self.gamma와 self.beta를 (1, C, 1, 1) 또는 (1, D)로 reshape할 수 있습니다.
+        하지만 여기서 중요한 점은, self.gamma와 self.beta의 크기가 입력 feature의 개수 (2차원 입력의 경우) 또는 채널 수 (4차원 입력의 경우)와 일치해야 한다는 것입니다.
+        에러 발생의 원인:
+
+        에러 메시지에 따르면, gamma와 beta의 크기가 예상되는 크기와 일치하지 않습니다. 이는 BatchNormalization 계층이 2차원 입력을 받을 때 발생하는 것으로 보입니다. 이 경우 gamma와 beta는 입력 feature의 개수와 일치해야 합니다.
+        해결 방안:
+
+        BatchNormalization 클래스의 초기화에서 gamma와 beta의 크기를 조정할 필요가 있습니다. 이는 네트워크의 특정 계층 (예: 완전 연결 계층)의 출력 feature 수에 따라 달라질 수 있습니다.
+        예를 들어, 완전 연결 계층의 출력 feature 수가 100개라면, 해당 BatchNormalization 계층의 gamma와 beta는 길이가 100인 배열로 초기화되어야 합니다.
+        이를 위해 VGG6 클래스에서 각 BatchNormalization 계층을 초기화할 때 필요한 크기 정보를 전달해야 할 수도 있습니다.
+        이러한 수정은 모델의 전체 구조와 각 계층 간의 연결 방식에 영향을 미칩니다. 따라서 전체 모델 설계를 검토하고 필요에 따라 조정하는 것이 중요합니다.
+        """
+        if x.ndim == 2:  # 2차원인 경우
+            D = x.shape[1]
+            if self.gamma.size != D:
+                raise ValueError("Gamma size mismatch. Expected size: {}, but got size: {}".format(D, self.gamma.size))
+            if self.beta.size != D:
+                raise ValueError("Beta size mismatch. Expected size: {}, but got size: {}".format(D, self.beta.size))
+
+            gamma_reshaped = self.gamma.reshape(1, D)
+            beta_reshaped = self.beta.reshape(1, D)
+        else:  # 4차원인 경우
+            N, C, H, W = self.input_shape
+            gamma_reshaped = self.gamma.reshape(1, C, 1, 1)
+            beta_reshaped = self.beta.reshape(1, C, 1, 1)
+
         out = gamma_reshaped * normalized_input + beta_reshaped
-        
+
         return out
 
     def backward(self, dout):
@@ -1099,10 +1144,10 @@ class VGG6:
             pre_channel_num = conv_param['filter_num']
         
         # BatchNormalization 파라미터 추가
-        # for idx, conv_param in enumerate([conv_param_1, conv_param_2, conv_param_3, conv_param_4]):
-            # self.params['gamma' + str(idx + 1)] = np.ones(conv_param['filter_num'])
+        for idx, conv_param in enumerate([conv_param_1, conv_param_2, conv_param_3, conv_param_4]):
+            self.params['gamma' + str(idx + 1)] = np.ones(conv_param['filter_num'])
             # print(f"VGG6, 추가된 gamma 파라미터 : {self.params['gamma' + str(idx + 1)].shape}")  #(16,) , (32,), (32,), (64,)
-            # self.params['beta' + str(idx + 1)] = np.zeros(conv_param['filter_num'])
+            self.params['beta' + str(idx + 1)] = np.zeros(conv_param['filter_num'])
             # print(f"VGG6, 추가된 beta 파라미터 : {self.params['beta' + str(idx + 1)].shape}")  #(16,) , (32,), (32,), (64,)
 
         # 완전 연결 계층의 가중치와 편향 초기화
@@ -1121,7 +1166,7 @@ class VGG6:
         # (32, 16, 112, 112)
         self.layers.append(Convolution(self.params['W1'], self.params['b1'],
                                        conv_param_1['stride'], conv_param_1['pad']))
-        # self.layers.append(BatchNormalization(self.params['gamma1'], self.params['beta1']))
+        self.layers.append(BatchNormalization(self.params['gamma1'], self.params['beta1']))
         self.layers.append(ReLU())
 
         # 두 번째 컨볼루션 계층
@@ -1131,7 +1176,7 @@ class VGG6:
         # (32, 32, 112, 112) -> F2=32, H2=112, W2=112
         self.layers.append(Convolution(self.params['W2'], self.params['b2'],
                                        conv_param_2['stride'], conv_param_2['pad']))
-        # self.layers.append(BatchNormalization(self.params['gamma2'], self.params['beta2']))
+        self.layers.append(BatchNormalization(self.params['gamma2'], self.params['beta2']))
         self.layers.append(ReLU())
         
         # 첫 번째 풀링 계층
@@ -1146,7 +1191,7 @@ class VGG6:
         # (32, 32, 56, 56)
         self.layers.append(Convolution(self.params['W3'], self.params['b3'],
                                        conv_param_3['stride'], conv_param_3['pad']))
-        # self.layers.append(BatchNormalization(self.params['gamma3'], self.params['beta3']))
+        self.layers.append(BatchNormalization(self.params['gamma3'], self.params['beta3']))
         self.layers.append(ReLU())
 
         # 네 번째 컨볼루션 계층
@@ -1156,7 +1201,7 @@ class VGG6:
         # (32, 64, 28, 28) -> F4=64, H4=28, W4=28
         self.layers.append(Convolution(self.params['W4'], self.params['b4'],
                                        conv_param_4['stride'], conv_param_4['pad']))
-        # self.layers.append(BatchNormalization(self.params['gamma4'], self.params['beta4']))
+        self.layers.append(BatchNormalization(self.params['gamma4'], self.params['beta4']))
         self.layers.append(ReLU())
         
         # 두 번째 풀링 계층
@@ -1193,22 +1238,19 @@ class VGG6:
         Returns:
             numpy.ndarray: 모델의 예측 결과.
         """
-        # for layer in self.layers:
-        #     # 배치 정규화 계층의 경우 훈련 모드에 따라 다른 동작 수행
-        #     if isinstance(layer, BatchNormalization) or isinstance(layer, Pooling):
-        #         x = layer.forward(x)
-        #     elif isinstance(layer, FC_Layer):
-        #         # 컨볼루션 계층 출력을 평탄화
-        #         x = x.reshape(x.shape[0], -1)
-        #         x = layer.forward(x)
-        #     else:
-        #         x = layer.forward(x)
-                    
         for layer in self.layers:
-            if isinstance(layer, Dropout):
+            # 배치 정규화 계층의 경우 훈련 모드에 따라 다른 동작 수행
+            if isinstance(layer, BatchNormalization) or isinstance(layer, Pooling):
+                x = layer.forward(x)
+            elif isinstance(layer, FC_Layer):
+                # 컨볼루션 계층 출력을 평탄화
+                x = x.reshape(x.shape[0], -1)
+                x = layer.forward(x)
+            elif isinstance(layer, Dropout):
                 x = layer.forward(x, train_flg)
             else:
                 x = layer.forward(x)
+                    
         return x
     
     
@@ -1326,9 +1368,9 @@ class VGG6:
             if isinstance(layer, (Convolution, FC_Layer)):
                 layer.w = self.params['W' + str(i+1)]
                 layer.b = self.params['b' + str(i+1)]
-            # if isinstance(layer, BatchNormalization):
-            #     layer.gamma = self.params['gamma' + str(i+1)]
-            #     layer.beta = self.params['beta' + str(i+1)]
+            if isinstance(layer, BatchNormalization):
+                layer.gamma = self.params['gamma' + str(i+1)]
+                layer.beta = self.params['beta' + str(i+1)]
 
         print("Params loaded successfully:", self.params.keys())
         
